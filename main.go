@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	redis "github.com/go-redis/redis/v8"
@@ -46,4 +47,46 @@ func main() {
 	}
 
 	log.Printf("key %s found in redis, value=%s", mykey, value)
+
+	channelKey := "CHANNEL_*"
+	dbChannels, err := getAllKeyValue(channelKey)
+	if err != nil {
+		log.Printf("error while getAllKeyValue of %s: %s\n", channelKey, err.Error())
+	} else {
+		log.Printf("dbChannels: %+v\n", dbChannels)
+	}
+
+}
+
+func getAllKeyValue(searchkey string) (map[string]string, error) {
+	res := make(map[string]string)
+	// Scan all keys
+	var cursor uint64
+
+	ctx := context.Background()
+	for {
+		var keys []string
+		var err error
+		keys, cursor, err = redisService.Client.Scan(ctx, cursor, searchkey, 0).Result()
+		if err != nil {
+			fmt.Printf("Scan key: %s , error: %s\n", searchkey, err)
+			return res, err
+		}
+
+		for _, key := range keys {
+			val, err := redisService.Client.Get(ctx, key).Result()
+			if err != nil {
+				fmt.Printf("getAllKeyValue: error to get value from key  %s error %s\n", key, err)
+				fmt.Println("Error to get value from key: ", key)
+				continue
+			}
+			//Add to value
+			res[key] = val
+		}
+
+		if cursor == 0 { // no more keys
+			break
+		}
+	}
+	return res, nil
 }
